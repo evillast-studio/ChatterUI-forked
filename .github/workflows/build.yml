@@ -96,14 +96,23 @@ jobs:
         env:
           EXPO_NO_TELEMETRY: 1
 
-      # ── Forzar SOLO arm64-v8a (via gradle.properties, método oficial RN) ────
-      - name: Force arm64-v8a only
+      # ── Forzar SOLO arm64-v8a + ajustes de memoria ──────────────────────────
+      - name: Configure gradle.properties
         run: |
-          echo "" >> android/gradle.properties
-          echo "# ABI filter - solo arm64-v8a" >> android/gradle.properties
-          echo "reactNativeArchitectures=arm64-v8a" >> android/gradle.properties
+          cat >> android/gradle.properties << 'PROPS'
 
-      # ── Keystore (DESPUÉS de prebuild para que exista android/app/) ─────────
+          # ABI - solo arm64-v8a
+          reactNativeArchitectures=arm64-v8a
+
+          # Memoria - evitar OOM en R8/minification
+          org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8
+          org.gradle.daemon=false
+          org.gradle.parallel=false
+          org.gradle.configureondemand=false
+          kotlin.daemon.jvm.options=-Xmx2g
+          PROPS
+
+      # ── Keystore ────────────────────────────────────────────────────────────
       - name: Decode keystore
         run: |
           mkdir -p android/app
@@ -116,13 +125,14 @@ jobs:
           ./gradlew assembleRelease \
             --no-daemon \
             --no-configuration-cache \
+            --no-parallel \
             --max-workers=2 \
             -Pandroid.injected.signing.store.file=$GITHUB_WORKSPACE/android/app/release.keystore \
             -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
             -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
             -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
         env:
-          GRADLE_OPTS: "-Xmx4g -XX:+HeapDumpOnOutOfMemoryError"
+          GRADLE_OPTS: "-Xmx6g -XX:MaxMetaspaceSize=512m"
           CMAKE_C_COMPILER_LAUNCHER: ccache
           CMAKE_CXX_COMPILER_LAUNCHER: ccache
 
