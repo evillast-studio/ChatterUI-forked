@@ -101,24 +101,15 @@ jobs:
         run: |
           cat >> android/gradle.properties << 'PROPS'
 
-          # ABI - solo arm64-v8a
           reactNativeArchitectures=arm64-v8a
-
-          # Memoria - evitar OOM en R8/minification
-          org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8
+          org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8
           org.gradle.daemon=false
           org.gradle.parallel=false
           org.gradle.configureondemand=false
           kotlin.daemon.jvm.options=-Xmx2g
           PROPS
 
-      # ── Keystore ────────────────────────────────────────────────────────────
-      - name: Decode keystore
-        run: |
-          mkdir -p android/app
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
-
-      # ── Build ────────────────────────────────────────────────────────────────
+      # ── Build con debug signing (sin keystore propio) ────────────────────────
       - name: Build Release APK
         working-directory: android
         run: |
@@ -126,20 +117,11 @@ jobs:
             --no-daemon \
             --no-configuration-cache \
             --no-parallel \
-            --max-workers=2 \
-            -Pandroid.injected.signing.store.file=$GITHUB_WORKSPACE/android/app/release.keystore \
-            -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
-            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
-            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
+            --max-workers=2
         env:
           GRADLE_OPTS: "-Xmx6g -XX:MaxMetaspaceSize=512m"
           CMAKE_C_COMPILER_LAUNCHER: ccache
           CMAKE_CXX_COMPILER_LAUNCHER: ccache
-
-      # ── Limpiar keystore ────────────────────────────────────────────────────
-      - name: Remove keystore
-        if: always()
-        run: rm -f android/app/release.keystore
 
       # ── Subir APK ───────────────────────────────────────────────────────────
       - name: Upload APK
